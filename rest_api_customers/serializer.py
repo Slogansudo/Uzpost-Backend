@@ -19,10 +19,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                     "last_name": self.user.last_name,
                     "region": self.user.region,
                     "district": self.user.district,
+                    "index": self.user.post_index,
                     "image": self.user.image.url if self.user.image else None,
                     "activated": self.user.is_active,
                     "created_at": self.user.created_at,
-                    "full_name": f"{self.user.first_name} {self.user.last_name}"
                 }
             },
             "status": "success"

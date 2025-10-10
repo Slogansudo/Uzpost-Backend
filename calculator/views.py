@@ -22,27 +22,42 @@ from django.utils.decorators import method_decorator
 from zeep import Client
 from zeep.helpers import serialize_object
 
+<<<<<<< HEAD
 from rest_framework_simplejwt.views import TokenObtainPairView
+=======
+>>>>>>> 2d32d04 (full complated uzpost backend)
 from core.middleware import static_token_required
 from rest_framework.pagination import PageNumberPagination
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
+<<<<<<< HEAD
 from .import_data import import_data
 from .ImportPochtamat import ImportPostalOffice
 from .models import Warehouse
 from .serializers import WarehouseSerializer
+=======
+from maps.models import Warehouse
+from maps.serializers import WarehouseSerializer
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+>>>>>>> 2d32d04 (full complated uzpost backend)
 
 
 class CustomUserThrottle(UserRateThrottle):
     rate = '30/minute'
 
 
+<<<<<<< HEAD
 class ResultExelView(APIView):
     def get(self, request):
         data = ImportPostalOffice()
         return Response(data=data, status=status.HTTP_200_OK)
 
 
+=======
+>>>>>>> 2d32d04 (full complated uzpost backend)
 class IsCustomUsersPost(BasePermission):
     def has_permission(self, request, view):
         if request.method in ('GET', 'POST', 'OPTIONS'):
@@ -88,8 +103,13 @@ def gettoken():
 
     # Token olish uchun so'rov
     values = {
+<<<<<<< HEAD
         "username": "+998505850551",
         "password": "Uzpost@9933",
+=======
+        "username": os.getenv('USERNAME'),
+        "password": os.getenv('PASSWORD'),
+>>>>>>> 2d32d04 (full complated uzpost backend)
         "remember_me": True
     }
     headers = {
@@ -311,7 +331,11 @@ class CalculatorShipoxView(APIView):
         try:
             weight = float(weight)
         except ValueError:
+<<<<<<< HEAD
             return Response(data="Invalid weight: Must be an integer", status=status.HTTP_400_BAD_REQUEST)
+=======
+            return Response(data="Invalid weight: Must be an float", status=status.HTTP_400_BAD_REQUEST)
+>>>>>>> 2d32d04 (full complated uzpost backend)
         service_type_id = request.query_params.get("ServiceTypeId")
         if service_type_id is None:
             return Response(data="ServiceTypeId should be int", status=status.HTTP_400_BAD_REQUEST)
@@ -320,14 +344,21 @@ class CalculatorShipoxView(APIView):
         except ValueError:
             return Response(data="Invalid ServiceTypeId: Must be an integer", status=status.HTTP_400_BAD_REQUEST)
 
+<<<<<<< HEAD
         fromjurisdiction_id = request.query_params.get("FromJrisdictionId")
         if fromjurisdiction_id is None:
             return Response(data="FromJrisdictionId should be int", status=status.HTTP_400_BAD_REQUEST)
+=======
+        fromjurisdiction_id = request.query_params.get("FromJurisdictionId")
+        if fromjurisdiction_id is None:
+            return Response(data="Invalid FromJrisdictionId", status=status.HTTP_400_BAD_REQUEST)
+>>>>>>> 2d32d04 (full complated uzpost backend)
         try:
             fromjurisdiction_id = int(fromjurisdiction_id)
         except ValueError:
             return Response(data="Invalid FromJrisdictionId: Must be an integer", status=status.HTTP_400_BAD_REQUEST)
 
+<<<<<<< HEAD
         tojurisdiction_id = request.query_params.get("ToJrisdictionId")
 
         if tojurisdiction_id is None:
@@ -336,6 +367,16 @@ class CalculatorShipoxView(APIView):
             tojurisdiction_id = int(tojurisdiction_id)
         except ValueError:
             return Response(data="Invalid ToJrisdictionId: Must be an integer", status=status.HTTP_400_BAD_REQUEST)
+=======
+        tojurisdiction_id = request.query_params.get("ToJurisdictionId")
+
+        if tojurisdiction_id is None:
+            return Response(data="Invalid ToJurisdictionId")
+        try:
+            tojurisdiction_id = int(tojurisdiction_id)
+        except ValueError:
+            return Response(data="Invalid ToJurisdictionId: Must be an integer", status=status.HTTP_400_BAD_REQUEST)
+>>>>>>> 2d32d04 (full complated uzpost backend)
 
         request = requests.get('https://prodapi.pochta.uz/api/v2/jurisdiction/choose/list', headers=headers)
         data_2 = request.json()
@@ -357,9 +398,15 @@ class CalculatorShipoxView(APIView):
                 to_longitude = i["lng"]
         request = requests.get(f'https://prodapi.pochta.uz/api/v2/customer/packages/prices/starting_from?dimensions.weight={weight}&service_type={service_type_id}&page=0&size=20&fromJurisdictionId='
                                f'{fromJurisdictionId}&toJurisdictionId={toJurisdictionId}&from_latitude={from_latitude}&from_longitude={from_longitude}&to_latitude={to_latitude}&to_longitude={to_longitude}', headers=headers)
+<<<<<<< HEAD
         request_x = requests.get(f"https://prodapi.pochta.uz/api/v2/customer/packages/prices/starting_from?dimensions.weight={weight}&service_type={service_type_id}&fromJurisdictionId={fromJurisdictionId}&toJurisdictionId={toJurisdictionId}", headers=headers)
         data = request.json()
         data_x = request_x.json()
+=======
+        data = request.json()
+        if data["status"] != "success":
+            return Response([data], status=status.HTTP_400_BAD_REQUEST)
+>>>>>>> 2d32d04 (full complated uzpost backend)
         x = [data]
         return Response(data=x, status=status.HTTP_200_OK)
 
@@ -377,6 +424,7 @@ class CalculatorShipoxIndexView(APIView):
         }
 
         data = {}
+<<<<<<< HEAD
         weight = request.query_params.get("weight")
         if weight is None:
             return Response(data="Invalid weight: Missing parameter", status=status.HTTP_400_BAD_REQUEST)
@@ -398,10 +446,34 @@ class CalculatorShipoxIndexView(APIView):
         fromjurisdiction_id = request.query_params.get("fromjurisdiction_id")
         if fromjurisdiction_id is None:
             return Response(data="Invalid fromjurisdiction_id: Missing parameter",
+=======
+        weight = request.query_params.get("Weight")
+        if weight is None:
+            return Response(data="Invalid Weight: Missing parameter", status=status.HTTP_400_BAD_REQUEST)
+        try:
+            weight = float(weight)
+        except ValueError:
+            return Response(data="Invalid Weight: Must be a float", status=status.HTTP_400_BAD_REQUEST)
+
+        # service_type_id ni tekshirish
+        service_type_id = request.query_params.get("ServiceTypeId")
+        if service_type_id is None:
+            return Response(data="Invalid ServiceTypeId: Missing parameter", status=status.HTTP_400_BAD_REQUEST)
+        try:
+            service_type_id = int(service_type_id)
+        except ValueError:
+            return Response(data="Invalid ServiceTypeId: Must be an integer", status=status.HTTP_400_BAD_REQUEST)
+
+        # fromjurisdiction_id ni tekshirish
+        fromjurisdiction_id = request.query_params.get("FromJurisdictionId")
+        if fromjurisdiction_id is None:
+            return Response(data="Invalid FromJurisdictionId: Missing parameter",
+>>>>>>> 2d32d04 (full complated uzpost backend)
                             status=status.HTTP_400_BAD_REQUEST)
         try:
             fromjurisdiction_id = int(fromjurisdiction_id)
         except ValueError:
+<<<<<<< HEAD
             return Response(data="Invalid fromjurisdiction_id: Must be an integer",
                             status=status.HTTP_400_BAD_REQUEST)
 
@@ -409,6 +481,15 @@ class CalculatorShipoxIndexView(APIView):
         index = request.query_params.get("index")
         if index is None:
             return Response(data="Invalid index: Missing parameter", status=status.HTTP_400_BAD_REQUEST)
+=======
+            return Response(data="Invalid FromJurisdictionId: Must be an integer",
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # index ni tekshirish
+        index = request.query_params.get("Index")
+        if index is None:
+            return Response(data="Invalid Index: Missing parameter", status=status.HTTP_400_BAD_REQUEST)
+>>>>>>> 2d32d04 (full complated uzpost backend)
 
         # Omborxona ma'lumotini olish
         warehouse = Warehouse.objects.filter(index=str(index)).first()
@@ -431,9 +512,15 @@ class CalculatorShipoxIndexView(APIView):
                 from_longitude = i["lng"]
         request = requests.get(f'https://prodapi.pochta.uz/api/v2/customer/packages/prices/starting_from?dimensions.weight={weight}&service_type={service_type_id}&page=0&size=20&fromJurisdictionId='
                                f'{fromJurisdictionId}&toJurisdictionId={toJurisdictionId}&from_latitude={from_latitude}&from_longitude={from_longitude}&to_latitude={to_latitude}&to_longitude={to_longitude}', headers=headers)
+<<<<<<< HEAD
         request_x = requests.get(f"https://prodapi.pochta.uz/api/v2/customer/packages/prices/starting_from?dimensions.weight={weight}&service_type={service_type_id}&fromJurisdictionId={fromJurisdictionId}&toJurisdictionId={toJurisdictionId}", headers=headers)
         data = request.json()
         data_x = request_x.json()
+=======
+        data = request.json()
+        if data["status"] != "success":
+            return Response([data], status=status.HTTP_400_BAD_REQUEST)
+>>>>>>> 2d32d04 (full complated uzpost backend)
         x = [data]
         return Response(data=x, status=status.HTTP_200_OK)
 
@@ -447,6 +534,7 @@ class CalculatorShipoxIndexView(APIView):
 #         fields = ["warehouse_name"]
 
 
+<<<<<<< HEAD
 class PostIndexesView(APIView):
     permission_classes = [IsCustomUsersPost]
     throttle_classes = [CustomUserThrottle, ]
@@ -462,6 +550,35 @@ class PostIndexesView(APIView):
         data = Warehouse.objects.filter(warehouse_name__icontains=query_x)
         serializer = WarehouseSerializer(data, many=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
+=======
+from django.db.models import Q
+
+
+class PostIndexesView(APIView):
+    permission_classes = [IsCustomUsersPost]
+    throttle_classes = [CustomUserThrottle]
+
+    def get(self, request):
+        allow_params = ["warehouse_name", "city_name", "city_code", "region_name", "index"]
+        filters = Q()
+
+        # Dinamik filtrlash
+        for param in allow_params:
+            value = request.query_params.get(param)
+            if value:
+                if param != "city_code":
+                    value = to_cyrillic(value)
+                filters |= Q(**{f"{param}__icontains": value})
+
+        if filters:
+            # Filtrlangan natijalar
+            data_x = Warehouse.objects.filter(filters)
+            serializer = WarehouseSerializer(data_x, many=True)
+            return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+        # Agar hech narsa topilmasa bo'sh ro'yxat qaytariladi
+        return Response(data=[], status=status.HTTP_200_OK)
+>>>>>>> 2d32d04 (full complated uzpost backend)
 
 
 class PostIndexesAllView(APIView):
@@ -484,6 +601,7 @@ class PostIndexesAllView(APIView):
 
 
 
+<<<<<<< HEAD
 
 
 
@@ -546,3 +664,5 @@ class PostIndexesAllView(APIView):
 
 
 
+=======
+>>>>>>> 2d32d04 (full complated uzpost backend)

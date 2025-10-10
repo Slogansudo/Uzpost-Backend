@@ -1,9 +1,15 @@
 from django.urls import path, include
+<<<<<<< HEAD
 from .views import (OrderServicesView, CalculatorShipoxView, LocationsUZbUZbView, LocationsKrelUZbView, LocationsAllView, VIloyatuzbView, VIloyatkrlView, ResultExelView,
     CalculatorShipoxIndexView, LocationsKrelAllView, PostIndexesView, PostIndexesAllView)
 from .create import CreateOrderApiView, CancelOrderAPIView, CreateOderIndexAPIView
 
 
+=======
+from .views import (OrderServicesView, CalculatorShipoxView, LocationsUZbUZbView, LocationsKrelUZbView, LocationsAllView, VIloyatuzbView, VIloyatkrlView,
+    CalculatorShipoxIndexView, LocationsKrelAllView, PostIndexesView, PostIndexesAllView)
+from .create import CreateOrderApiView, CancelOrderAPIView, CreateOderIndexAPIView, ShippingLabelOrderAPIView
+>>>>>>> 2d32d04 (full complated uzpost backend)
 
 
 urlpatterns = [
@@ -16,11 +22,20 @@ urlpatterns = [
     path("locations-district/uzb/", LocationsUZbUZbView.as_view(), name='locations-uzb'),
     path("locations-others/uzb/", LocationsAllView.as_view(), name='locations-all-uz'),
     path("locations-others/krel/", LocationsKrelAllView.as_view(), name='locations-all-krel'),
+<<<<<<< HEAD
     path("results/", ResultExelView.as_view(), name='exel'),
+=======
+>>>>>>> 2d32d04 (full complated uzpost backend)
     path("post/indexes/", PostIndexesView.as_view(), name='post-index'),
     path("post/indexes/all/", PostIndexesAllView.as_view(), name='post-indexes-all'),
     path("create/order/", CreateOrderApiView.as_view(), name='create-order'),
     path("create/order/index/", CreateOderIndexAPIView.as_view(), name='create-order-index'),
+<<<<<<< HEAD
     path("cancel/order/", CancelOrderAPIView.as_view(), name='cancel-order')
+=======
+    path("cancel/order/", CancelOrderAPIView.as_view(), name='cancel-order'),
+    path("shipping/order/", ShippingLabelOrderAPIView.as_view(), name='shipping-order')
+    ################################################################################
+>>>>>>> 2d32d04 (full complated uzpost backend)
 
 ]

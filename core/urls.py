@@ -20,7 +20,11 @@ urlpatterns = [
     path('api/v1/public/', include('rest_api_customers.urls')),
     path('api/v1/manage/', include('rest_api_management.urls')),
     path('api/v1/calculator/', include('calculator.urls')),
+<<<<<<< HEAD
 
+=======
+    path('api/v1/maps/', include('maps.urls')),
+>>>>>>> 2d32d04 (full complated uzpost backend)
     #path('api/v1/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     #path('api/v1/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('', include('models.urls')),
@@ -31,6 +35,6 @@ if settings.DEBUG:
 else:
     urlpatterns += [
         re_path(r'^download_media/(?P<path>.*)$', protected_media, name='protected_media'),
-        re_path(r'^media/(?P<path>.*)$', login_required(serve), {'document_root': settings.MEDIA_ROOT}),
+        re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
         re_path(r'^static/(?P<path>.*)$', serve, {'document_root': settings.STATIC_ROOT}),
     ]

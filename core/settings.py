@@ -14,17 +14,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-vg6cm-bk!@ufc)pu3efcl$^cmu_6bqrfb7(mypxwag1z(z-jr0'
-# "django-insecure-+9cc1jqjrr8ep()6xs#&=9xt1h1t^hkafqyc64vx@+(h^3n%3+"
+SECRET_KEY = os.getenv('SECRET_KEY')
+
 
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 APPEND_SLASH = False
 ALLOWED_HOSTS = ["*"]
-#209.97.184.213
-#10.100.0.24
 
 # Application definition
 
@@ -52,7 +50,8 @@ INSTALLED_APPS = [
     'rest_api_customers',
     'rest_api_management',
     'calculator',
-]
+    'maps'
+    ]
 
 
 MIDDLEWARE = [
@@ -72,37 +71,13 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# settings.py
 
-# CACHES = {
-#     'default': {
-#         'BACKEND': 'django_redis.cache.RedisCache',
-#         'LOCATION': 'redis://192.168.1.100:6379/1',
-#         'OPTIONS': {
-#             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-#         },
-#     }
-# }
-
-
-#os.getenv("STATIC_API_TOKEN")
-
-#CSRF_COOKIE_SECURE = True
-##SESSION_COOKIE_SECURE = True
-#CSRF_COOKIE_HTTPONLY = True
-##USE_X_FORWARDED_HOST = True
-#SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-#CSRF_TRUSTED_ORIGINS = ['https://new.pochta.uz', 'http://new.pochta.uz']
-#SESSION_COOKIE_DOMAIN = 'new.pochta.uz'
-#CSRF_COOKIE_DOMAIN = 'new.pochta.uz'
 
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8000",
     "http://localhost:3000",
     "http://127.0.0.1:8000",
-    "http://209.97.184.213",
-    "https://209.97.184.213",
 ]
 
 
@@ -155,7 +130,7 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',
     ),
     'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.UserRateThrottle',
+        #'rest_framework.throttling.UserRateThrottle',
         'core.throttling.CustomRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
@@ -232,5 +207,7 @@ else:
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+MEDIA_ROOT = '/home/progr/uz_post/media/'
+#MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 

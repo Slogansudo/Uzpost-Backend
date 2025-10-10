@@ -63,7 +63,6 @@ class CustomUserUnauthorizedThrottle(UserRateThrottle):
     rate = '15/minute'
 
 
-
 class UsersAPIView(APIView):
     permission_classes = [IsAdminUser, IsManagerProfileOrReadOnly]
     throttle_classes = [CustomUserThrottle, ]

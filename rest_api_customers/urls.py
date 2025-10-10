@@ -1,8 +1,5 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from drf_yasg.views import get_schema_view
-from drf_yasg import openapi
-from rest_framework.permissions import AllowAny
 from .views import (Barcode, TrackIsAuth, RegisterUserView, MyProfileView, UsersRequestsDetailView, VacanciesAPIViewSet, BannerAPIViewSet,MenuElementsAPIViewSet,
                     MenuAPIViewSet, StatisticItemsAPIViewSet, StatisticsAPIViewSet, TegRegionsAPIViewSet, TegWorkingDaysAPIViewSet,
                     TegExperiencesAPIViewSet, TegVacanciesAPIViewSet, TegBranches2APIViewSet,
@@ -21,22 +18,17 @@ from .views import (Barcode, TrackIsAuth, RegisterUserView, MyProfileView, Users
                     SlidesAPIViewSet, SocialMediaAPIViewSet, EssentialFactsAPIViewSet, RatesAPIViewSet,
                     ServicesAPIViewSet, CharterSocietyAPIViewSet,
                     SecurityPapersAPIViewSet, FAQAPIViewSet, SiteSettingsAPIViewSet, CategoryPagesViewSet, ControlCategoryPageViewSet, TmuTrackAPIView,
+<<<<<<< HEAD
                     Test, CategoryServicesAPIViewSet, MarksAsosiyAPIViewSet, CategoryFAQAPIViewSet)
+=======
+                    CategoryServicesAPIViewSet, MarksAsosiyAPIViewSet, CategoryFAQAPIViewSet)
+>>>>>>> 2d32d04 (full complated uzpost backend)
 
-from .views import CustomTokenObtainPairView
+from .views import CustomTokenObtainPairView, RegisterUser2View, RegisterUser3View, Barcode_new
+from .recover_password import RecoverPassword3APIView
+from .new_register import RegisterNEWAPIView
+from .newtrackapk import NewTrackAPK
 
-schema_view = get_schema_view(
-    openapi.Info(
-        title="UzPOST API",
-        default_version='v1',
-        description="Demo UzPOST API",
-        terms_of_service='demo.com',
-        contact=openapi.Contact(email='<EMAIL>'),
-        license=openapi.License(name='demo service')
-    ),
-    public=True,
-    permission_classes=(AllowAny,),
-)
 
 router = DefaultRouter()
 router.register('banners', viewset=BannerAPIViewSet)
@@ -96,15 +88,19 @@ router.register("category-faq", viewset=CategoryFAQAPIViewSet, basename="categor
 
 urlpatterns = [
     path('', include(router.urls)),
-    path("test/<slug:barcode>/", Test.as_view(), name="test"),
     path('authenticate/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
-    # path('docs-swagger/', schema_view.with_ui("swagger", cache_timeout=0), name='swagger'),
-    # path('docs-redoc/', schema_view.with_ui("redoc", cache_timeout=0), name='redoc'),
-    path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
-    path('register/', RegisterUserView.as_view(), name='register'),
+    path('register/1/', RegisterUserView.as_view(), name='register1'),
+    path('register/2/', RegisterUser2View.as_view(), name='register2'),
+    path('register/3/', RegisterUser3View.as_view(), name='register3'),
     path('profile/', MyProfileView.as_view(), name='profile'),
-    path('track/<slug:barcode>/', Barcode.as_view(), name='barcode'),
+    path('track/<slug:barcode>/', Barcode_new.as_view(), name='barcode'),
     path('tracking/<slug:barcode>/', TrackIsAuth.as_view(), name='auth-tracking'),
     path('temutrack/<slug:barcode>/', TmuTrackAPIView.as_view(), name='temutrack'),
+    path("trackapk/<slug:barcode>", NewTrackAPK.as_view(), name="track-apk"),
     path('userrequests/', UsersRequestsDetailView.as_view(), name='user_requests'),
+<<<<<<< HEAD
+=======
+    path('recovery/password/', RecoverPassword3APIView.as_view(), name='recovery-password-3'),
+    path('register/new/', RegisterNEWAPIView.as_view(), name='register-new')
+>>>>>>> 2d32d04 (full complated uzpost backend)
 ]

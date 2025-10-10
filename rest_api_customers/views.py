@@ -19,7 +19,7 @@ from rest_framework.decorators import action
 from django.contrib.auth.models import Group, Permission
 
 # new
-from models.models import (CustomUser, UsersRequests, IPAddressLog)
+from models.models import (CustomUser, UsersRequests, IPAddressLog, CheckSMS)
 from db_models.models import (Banners, MenuElements, Menu, StatisticItems, Statistics, TegRegions, TegWorkingDays,
                               TegExperience, TegVacancies, TegBranches2, Vacancies, Purchases, Marks, SaveMediaFiles,
                               Events, UzPostNews, PostalServices, Pages, BranchServices, ShablonServices, Branches,
@@ -48,11 +48,28 @@ from zeep import Client
 from zeep.helpers import serialize_object
 
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.tokens import RefreshToken
 from .serializer import CustomTokenObtainPairSerializer
 from core.middleware import static_token_required
 from rest_framework.pagination import PageNumberPagination
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
+<<<<<<< HEAD
+=======
+from requests.auth import HTTPBasicAuth
+from random import randint
+import uuid
+from django.utils import timezone
+from datetime import datetime
+from datetime import timedelta
+from calculator.models import OrderCart
+from dotenv import load_dotenv
+import os
+from django.db.models import Q
+from .send_sms import send_sms
+
+load_dotenv()
+>>>>>>> 2d32d04 (full complated uzpost backend)
 
 
 class CustomPagination(PageNumberPagination):
@@ -82,9 +99,23 @@ class CustomUserUnauthorizedThrottle(UserRateThrottle):
     rate = '15/minute'
 
 
+class RegisterUnauthorizedThrottle(UserRateThrottle):
+    rate = '5/minute'
+
+
 class IsCustomUsersGet(BasePermission):
     def has_permission(self, request, view):
         if request.method in ('GET', 'OPTIONS'):
+            return True
+        return False
+
+
+class TwoFACTauthPermissions(BasePermission):
+    def has_permission(self, request, view):
+        token = request.headers.get("X-API-Token")
+        if not token:
+            return False
+        if token == "abdullo":
             return True
         return False
 
@@ -134,8 +165,8 @@ def gettoken():
 
     # Token olish uchun so'rov
     values = {
-        "username": "+998505850551",
-        "password": "Uzpost@9933",
+        "username": "uzpost",
+        "password": "q%0-E5~3T#i&",
         "remember_me": True
     }
     headers = {
@@ -160,6 +191,74 @@ def gettoken():
 
 class RegisterUserView(APIView):
     permission_classes = [AllowAny, ]
+    throttle_classes = [RegisterUnauthorizedThrottle, ]
+    def post(self, request):
+        phone_number = request.data.get('phone_number')
+        if not phone_number:
+            return Response(data="No phone number provided", status=status.HTTP_400_BAD_REQUEST)
+        if type(phone_number) != str:
+            return Response(data="phone number is type invalid it is type str", status=status.HTTP_400_BAD_REQUEST)
+        if len(phone_number) != 9:
+            return Response(data="phone number should not exceed 9 characters", status=status.HTTP_400_BAD_REQUEST)
+        if not phone_number.isdigit():
+            return Response(data="Phone number is invalid", status=status.HTTP_400_BAD_REQUEST)
+
+        database_number = f"+998{phone_number}"
+        custom_user = CustomUser.objects.filter(phone_number=database_number).first()
+        if custom_user:
+            return Response('custom user with this phone number already exists.', status=status.HTTP_400_BAD_REQUEST)
+        last_sms = CheckSMS.objects.filter(phone_number=database_number).order_by('-created_at').first()
+        if last_sms:
+            time_diff = timezone.now() - last_sms.created_at
+            if time_diff < timedelta(minutes=1):
+                remaining_time = timedelta(minutes=1) - time_diff
+                return Response(f'Please try again after {remaining_time} minutes.', status=status.HTTP_400_BAD_REQUEST)
+
+        sms_code = randint(1000, 9999)
+        massage_id = str(uuid.uuid4())
+        # post_sms = {
+        # "messages":
+        # [
+        # {
+        #     "recipient": f"998{phone_number}",
+        #     "message-id": f"{massage_id}",
+        #
+        # "sms":{
+        #     "originator": "3700",
+        #     "content": {
+        #         "text": f"UzPost veb saytiga kirish uchun kod: {sms_code}. Kodni hech kimga bermang! Tel: 1165"
+        #             }
+        # }
+        # }
+        # ]
+        # }
+        post_sms = {
+                "messages": [
+                    {
+                        "recipient": f"998{phone_number}",
+                        "message-id": f"{massage_id}",
+                        "sms": {
+                            "originator": "3700",
+                            "content": {
+                                "text": f"UzPost veb saytiga kirish uchun kod: {sms_code}. Kodni hech kimga bermang! Tel: 1165"
+                            }
+                        }
+                    }
+                ]
+            }
+        results = requests.post("https://smssend.avval.uz/SMSSend/send_sms_v2.php", json=post_sms, headers={'content-type': 'application/json'}, auth=HTTPBasicAuth(username="postuz_user_sms", password="3Ddwr1324fqeq@sdcswr#4wc"))
+
+        if results.status_code == 200:
+            CheckSMS.objects.create(
+                massage_id=massage_id,
+                code=sms_code,
+                phone_number=database_number)
+            return Response(data=results.json(), status=status.HTTP_200_OK)
+        return Response(data='Something went wrong', status=status.HTTP_400_BAD_REQUEST)
+
+
+class RegisterUser2View(APIView):
+    permission_classes = [AllowAny, ]
     throttle_classes = [CustomUserUnauthorizedThrottle, ]
 
     def post(self, request):
@@ -170,15 +269,54 @@ class RegisterUserView(APIView):
             return Response(data="phone number is type invalid it is type str", status=status.HTTP_400_BAD_REQUEST)
         if len(phone_number) != 9:
             return Response(data="phone number should not exceed 9 characters", status=status.HTTP_400_BAD_REQUEST)
-        phone_number = f"+998{phone_number}"
-        custom_user = CustomUser.objects.filter(phone_number=phone_number).first()
+        if not phone_number.isdigit():
+            return Response(data="Phone number is invalid", status=status.HTTP_400_BAD_REQUEST)
+        database_number = f"+998{phone_number}"
+        custom_user = CustomUser.objects.filter(phone_number=database_number).first()
         if custom_user:
             return Response('custom user with this phone number already exists.', status=status.HTTP_400_BAD_REQUEST)
+        code = request.data.get('code')
+        if not code:
+            return Response(data="No code provided", status=status.HTTP_400_BAD_REQUEST)
+        check_code = CheckSMS.objects.filter(phone_number=database_number).order_by("-created_at").first()
+        if not check_code:
+            return Response(data="Code does not exist", status=status.HTTP_400_BAD_REQUEST)
+        if code != check_code.code:
+            return Response(data="Code does not match", status=status.HTTP_400_BAD_REQUEST)
+        check_code.status = True
+        check_code.save()
+        return Response(data={"status": "success"}, status=status.HTTP_200_OK)
+
+
+class RegisterUser3View(APIView):
+    permission_classes = [AllowAny, ]
+    throttle_classes = [CustomUserUnauthorizedThrottle, ]
+
+    def post(self, request):
+        phone_number = request.data.get('phone_number')
+        if not phone_number:
+            return Response(data="No phone number provided", status=status.HTTP_400_BAD_REQUEST)
+        if type(phone_number) != str:
+            return Response(data="phone number is type invalid it is type str", status=status.HTTP_400_BAD_REQUEST)
+        if len(phone_number) != 9:
+            return Response(data="phone number should not exceed 9 characters", status=status.HTTP_400_BAD_REQUEST)
+        if not phone_number.isdigit():
+            return Response(data="Phone number is invalid", status=status.HTTP_400_BAD_REQUEST)
+        database_number = f"+998{phone_number}"
+        custom_user = CustomUser.objects.filter(phone_number=database_number).first()
+        if custom_user:
+            return Response('custom user with this phone number already exists.', status=status.HTTP_400_BAD_REQUEST)
+        check_code = CheckSMS.objects.filter(phone_number=database_number).order_by("-created_at").first()
+        if not check_code:
+            return Response(data="Code does not exist", status=status.HTTP_400_BAD_REQUEST)
+        if check_code.status != True:
+            return Response(data="phone number code not verified", status=status.HTTP_400_BAD_REQUEST)
         first_name = request.data.get('first_name')
         last_name = request.data.get('last_name')
         image = request.data.get('image')
         region = request.data.get('region')
         district = request.data.get('district')
+        index = request.data.get('index')
         if not first_name:
             first_name = None
         if not last_name:
@@ -189,6 +327,8 @@ class RegisterUserView(APIView):
             region = None
         if not district:
             district = None
+        if not index:
+            index = None
 
         password = request.data.get('password')
         if not password:
@@ -198,96 +338,247 @@ class RegisterUserView(APIView):
         if len(password) < 6:
             return Response('password must be longer than 6 characters', status=status.HTTP_400_BAD_REQUEST)
 
-        custom_user = CustomUser(
-            phone_number=phone_number,
+        custom_user = CustomUser.objects.create(
+            phone_number=database_number,
             first_name=first_name,
             last_name=last_name,
             image=image,
             region=region,
             district=district,
+            post_index=index,
             password=make_password(password)  # Parolni hashlash
 
         )
-        custom_user.save()
+        refresh = RefreshToken.for_user(custom_user)
+        id_token = str(refresh.access_token)
         data = {
-            "phone_number": phone_number,
+            "phone_number": database_number,
             'first_name': first_name,
             'last_name': last_name,
             'region': region,
             'district': district,
+            "index": index,
             'password': "********",
             "image": None,
-            "status": "successful"
+            "status": "successful",
+            "id_token": id_token
         }
+        check_code.delete()
+        all_sms = CheckSMS.objects.filter(phone_number=database_number)
+        all_sms.delete()
         return Response(data=data, status=status.HTTP_201_CREATED)
 
 
 class MyProfileView(APIView):
-     permission_classes = [IsAuthenticated, ]
-     throttle_classes = [CustomUserThrottle, ]
+    permission_classes = [IsAuthenticated, ]
+    throttle_classes = [CustomUserThrottle, ]
 
-     def get(self, request):
-         user = CustomUser.objects.filter(phone_number=request.user.phone_number).first()
-         data = {
-             "phone_number": user.phone_number,
-             'first_name': user.first_name,
-             'last_name': user.last_name,
-             'image': user.image.url if user.image else None,
-             'region': user.region,
-             'district': user.district,
-             'password': "********"
-         }
-         return Response(data, status=status.HTTP_200_OK)
+    def get(self, request):
+        user = CustomUser.objects.filter(phone_number=request.user.phone_number).first()
+        user_orders = OrderCart.objects.filter(user=user, archiving_status=True).order_by('-created_at')
+        for order in user_orders:
+            check_time = timezone.now() - order.created_at
+            if check_time > timedelta(days=15):
+                order.archiving_status = False
+                order.save()
+        if not user:
+            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
-     def put(self, request):
-         user = CustomUser.objects.filter(phone_number=request.user.phone_number).first()
-         if not user:
-             return Response("User not found", status=status.HTTP_404_NOT_FOUND)
+        allow_params_1 = [
+            "barcode", "fromjurisdiction", "tojurisdiction", "from_phone_number", "full_name",
+            "from_country_code", "to_country_code", "payment_type", "shipment_type"
+        ]
+        filters = Q(user=user) & Q(archiving_status=True)
+        filters_archives = Q(user=user) & Q(archiving_status=False)
+        # Dinamik filtrlarni qo'llash
+        for param in allow_params_1:
+            value = request.query_params.get(param)
+            if value:  # Faqat qiymat mavjud bo'lsa filtr qo'llanadi
+                filters &= Q(**{f"{param}__icontains": value})
+                filters_archives &= Q(**{f"{param}__icontains": value})
 
-         data = request.data
-         first_name = data.get('first_name')
-         last_name = data.get('last_name')
-         image = request.FILES.get('image')
-         remove_image = data.get('remove_image')  # Rasmni o'chirish uchun bayroq
-         region = data.get('region')
-         district = data.get('district')
-         password = data.get('password')
+        # Vaqt oralig'i validatsiyasi
+        from_date = request.query_params.get("from_created_at")
+        to_date = request.query_params.get("to_created_at")
+        try:
+            if from_date:
+                from_date = datetime.strptime(from_date, "%Y-%m-%d")
+                filters &= Q(created_at__gte=from_date)
+                filters_archives &= Q(created_at__gte=from_date)
+            if to_date:
+                to_date = datetime.strptime(to_date, "%Y-%m-%d")
+                filters &= Q(created_at__lte=to_date)
+                filters_archives &= Q(created_at__lte=to_date)
+        except ValueError:
+            return Response({
+                "error": "Invalid date format. Use YYYY-MM-DD format for 'from_created_at' and 'to_created_at'."
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-         if not password:
-             return Response("Password must be entered", status=status.HTTP_400_BAD_REQUEST)
-         if len(password) < 6:
-             return Response('Password must be longer than 6 characters', status=status.HTTP_400_BAD_REQUEST)
+        orders = OrderCart.objects.filter(filters)
+        archives_orders = OrderCart.objects.filter(filters_archives)
 
-         user.first_name = first_name if first_name else user.first_name
-         user.last_name = last_name if last_name else user.last_name
-         if image:
-             if user.image:
+        # Natijalarni shakllantirish
+        orders_data = [
+            {
+                "weight": order.weight,
+                "barcode": order.barcode,
+                "from_jurisdiction": order.fromjurisdiction,
+                "to_jurisdiction": order.tojurisdiction,
+                "from_phone_number": order.from_phone_number,
+                "to_phone_number": order.to_phone_number,
+                "full_name": order.full_name,
+                "from_country_code": order.from_country_code,
+                "to_country_code": order.to_country_code,
+                "price": order.price,
+                "price_code": order.price_code,
+                "payment_type": order.payment_type,
+                "shipment_type": order.shipment_type,
+                "shipox_created_at": order.shipox_created_at,
+                "shipox_last_status_date": order.shipox_last_status_date,
+                "order_status": order.order_status,
+                "created_at": order.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            }
+            for order in orders
+        ]
+        archive_orders_data = [
+            {
+                "weight": archives_order.weight,
+                "barcode": archives_order.barcode,
+                "from_jurisdiction": archives_order.fromjurisdiction,
+                "to_jurisdiction": archives_order.tojurisdiction,
+                "from_phone_number": archives_order.from_phone_number,
+                "to_phone_number": archives_order.to_phone_number,
+                "full_name": archives_order.full_name,
+                "from_country_code": archives_order.from_country_code,
+                "to_country_code": archives_order.to_country_code,
+                "price": archives_order.price,
+                "price_code": archives_order.price_code,
+                "payment_type": archives_order.payment_type,
+                "shipment_type": archives_order.shipment_type,
+                "shipox_created_at": archives_order.shipox_created_at,
+                "shipox_last_status_date": archives_order.shipox_last_status_date,
+                "order_status": archives_order.order_status,
+                "created_at": archives_order.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            }
+            for archives_order in archives_orders
+        ]
+
+        profile_data = {
+            "phone_number": user.phone_number,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "image": user.image.url if user.image else None,
+            "region": user.region,
+            "district": user.district,
+            "index": user.post_index,
+            "password": "********",
+            "orders": orders_data,
+            "archive_orders": archive_orders_data
+        }
+
+        return Response(profile_data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        phone_number = request.data.get('phone_number')
+        if not phone_number:
+            return Response(data="No phone number provided", status=status.HTTP_400_BAD_REQUEST)
+        if type(phone_number) != str:
+            return Response(data="phone number is type invalid it is type str", status=status.HTTP_400_BAD_REQUEST)
+        if len(phone_number) != 9:
+            return Response(data="phone number should not exceed 9 characters", status=status.HTTP_400_BAD_REQUEST)
+        if not phone_number.isdigit():
+            return Response(data="Phone number is invalid", status=status.HTTP_400_BAD_REQUEST)
+        database_number = f"+998{phone_number}"
+        custom_user = CustomUser.objects.filter(phone_number=database_number).first()
+        if custom_user == request.user:
+            return Response('this phone number your old number', status=status.HTTP_400_BAD_REQUEST)
+        if custom_user:
+            return Response("this phone number is already registered", status=status.HTTP_400_BAD_REQUEST)
+        check_code = CheckSMS.objects.filter(phone_number=database_number).order_by("-created_at").first()
+        if not check_code:
+            send_sms_code = send_sms(phone_number)
+            return Response(data=send_sms_code, status=status.HTTP_400_BAD_REQUEST)
+        if check_code.status != True:
+            code = request.data.get("code")
+            if code is None:
+                return Response(data="code is invalid", status=status.HTTP_400_BAD_REQUEST)
+            check_code = CheckSMS.objects.filter(phone_number=database_number).order_by("-created_at").first()
+            if not check_code:
+                return Response(data="code does not exist", status=status.HTTP_400_BAD_REQUEST)
+            if code != check_code.code:
+                return Response(data="code is invalid", status=status.HTTP_400_BAD_REQUEST)
+            check_code.status = True
+            check_code.save()
+            return Response(data="success", status=status.HTTP_200_OK)
+        custom_user = CustomUser.objects.filter(phone_number=request.user.phone_number).first()
+        custom_user.phone_number = database_number
+        custom_user.save()
+        data = {
+            "phone_number": database_number,
+            'first_name': custom_user.first_name,
+            'last_name': custom_user.last_name,
+            'region': custom_user.region,
+            'district': custom_user.district,
+            "index": custom_user.post_index,
+            'password': "********",
+            "image": None,
+            "status": "successful",
+        }
+        check_code.delete()
+        return Response(data=data, status=status.HTTP_200_OK)
+
+    def put(self, request):
+        user = CustomUser.objects.filter(phone_number=request.user.phone_number).first()
+        if not user:
+            return Response("User not found", status=status.HTTP_404_NOT_FOUND)
+
+        data = request.data
+        first_name = data.get('first_name')
+        last_name = data.get('last_name')
+        image = request.FILES.get('image')
+        remove_image = data.get('remove_image')  # Rasmni o'chirish uchun bayroq
+        index = data.get("index")
+        region = data.get('region')
+        district = data.get('district')
+        password = data.get('password')
+
+        if not password:
+            return Response("Password must be entered", status=status.HTTP_400_BAD_REQUEST)
+        if len(password) < 6:
+            return Response('Password must be longer than 6 characters', status=status.HTTP_400_BAD_REQUEST)
+
+        user.first_name = first_name if first_name else user.first_name
+        user.last_name = last_name if last_name else user.last_name
+        if image:
+            if user.image:
                 user.image.delete()
-             user.image = image  # Agar yangi rasm berilgan bo'lsa, yangilash
-         elif remove_image:
-             user.image.delete()  # Rasmni o'chirish
-             user.image = None
-         user.region = region if region else user.region
-         user.district = district if district else user.district
-         user.password = make_password(password)
-         user.save()
+            user.image = image  # Agar yangi rasm berilgan bo'lsa, yangilash
+        elif remove_image:
+            user.image.delete()  # Rasmni o'chirish
+            user.image = None
+        user.region = region if region else user.region
+        user.district = district if district else user.district
+        user.index = index if index else user.index
+        user.password = make_password(password)
+        user.save()
 
-         data = {
-             "phone_number": user.phone_number,
-             'first_name': user.first_name,
-             'last_name': user.last_name,
-             'image': user.image.url if user.image else None,  # URL yoki None
-             'region': user.region,
-             'district': user.district,
-             'password': "********"
-         }
-         return Response(data, status=status.HTTP_200_OK)
+        data = {
+            "phone_number": user.phone_number,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'image': user.image.url if user.image else None,  # URL yoki None
+            'region': user.region,
+            'district': user.district,
+            "index": user.post_index,
+            'password': "********"
+        }
+        return Response(data, status=status.HTTP_200_OK)
 
-     def delete(self, request):
-         user = CustomUser.objects.filter(phone_number=request.user.phone_number).first()
-         user.is_active = False
-         user.save()
-         return Response(data='successful deleted', status=status.HTTP_204_NO_CONTENT)
+    def delete(self, request):
+        user = CustomUser.objects.filter(phone_number=request.user.phone_number).first()
+        user.is_active = False
+        user.save()
+        return Response(data='successful deleted', status=status.HTTP_204_NO_CONTENT)
 
 
 @method_decorator(cache_page(60*15), name='dispatch')
@@ -409,139 +700,809 @@ class Barcode(APIView):
 from requests.exceptions import ConnectTimeout, RequestException
 
 
-@method_decorator(cache_page(60*1), name='dispatch')
-class Test(APIView):
-    permission_classes = [AllowAny, ]
-    throttle_classes = [CustomUserUnauthorizedThrottle, ]
-
+class Barcode_new(APIView):
     def get(self, request, barcode):
-        if (barcode[:2] == "RZ" or barcode[:2] == "CZ" or barcode[:1] == "E") and barcode[:3] != "EHM" and barcode[:3] != "EMI":
-            wsdl = 'http://10.100.0.69/IPSAPIService/TrackAndTraceService.svc?singleWsdl'
+        wsdl = 'http://10.100.0.69/IPSAPIService/TrackAndTraceService.svc?singleWsdl'
 
-            # SOAP servisi uchun ulanish
-            client = Client(wsdl=wsdl)
+        # SOAP servisi uchun ulanish
+        client = Client(wsdl=wsdl)
 
-            # Parametrlar tayyorlash
-            ids = barcode
-            # lang = 'RU'
-            token = '269a208f-7006-4dc6-b52f-6dfba6af113a'
+        # Parametrlar tayyorlash
+        ids = barcode
+        # lang = 'RU'
+        token = '269a208f-7006-4dc6-b52f-6dfba6af113a'
 
-            # GetMailitems metodini chaqirish
-            response = client.service.GetMailitems(ids=ids, token=token)
+        # GetMailitems metodini chaqirish
+        response = client.service.GetMailitems(ids=ids, token=token)
 
-            # SOAP javobini dictionary'ga aylantirish
-            response_data = serialize_object(response)
-            if response_data == None:
-                first = {
-                    "code": "order_not_found",
-                    "message": "Order Not Found",
-                    "request_id": "69f059d0-1748-42cc-982c-7a322c4e81fa",
-                    "status": "error"
-                }
-                return Response(data=first, status=status.HTTP_404_NOT_FOUND)
-            response_data_2 = response_data
-            if response_data_2[0]["InfoFromEdi"] != None:
-                for i in range(len(
-                        response_data_2[0]["InfoFromEdi"]["TMailitemInfoFromEDI"][0]["Events"]["TMailitemEventEDI"])):
-                    response_data_2[0]["InfoFromEdi"]["TMailitemInfoFromEDI"][0]["Events"]["TMailitemEventEDI"][i][
-                        "ReceivedDispatch"] = None
-            if response_data_2[0]["OperationalMailitems"] != None:
-                for j in range(len(response_data_2[0]["OperationalMailitems"]["TMailitemInfoFromScanning"][0]["Events"][
-                                       "TMailitemEventScanning"])):
-                    response_data_2[0]["OperationalMailitems"]["TMailitemInfoFromScanning"][0]["Events"][
-                        "TMailitemEventScanning"][j]["ReceivedDispatch"] = None
-            return Response(data=response_data_2, status=status.HTTP_200_OK)
+        # SOAP javobini dictionary'ga aylantirish
+        response_data = serialize_object(response)
+        if response_data == None:
+            first = {
+                "code": "order_not_found",
+                "message": "Order Not Found",
+                "request_id": "69f059d0-1748-42cc-982c-7a322c4e81fa",
+                "status": "error"
+            }
+            return Response(data=first, status=status.HTTP_404_NOT_FOUND)
+        response_data_2 = response_data
 
-        # header keladigan data
+        ###### shipox ips uchun
+        url_header = f"https://prodapi.pochta.uz/api/v1/public/order/{barcode}"
+        url_shipox = f"https://prodapi.pochta.uz/api/v1/customer/order/{barcode}/history_items"
+
+        data_header = requests.get(url_header, headers={
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {gettoken()}'
+        }, timeout=1)
+        data_shipox = requests.get(url_shipox, headers={
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {gettoken()}'
+        }, timeout=1)
+        data_header = data_header.json()
+        data_shipox = data_shipox.json()
+        if data_header['status'] != 'success':
+            return Response(data=data_header, status=404)
+        if data_shipox['status'] != 'success':
+            return Response(data=data_header, status=404)
+        full_track_temu = []
+
+
+
+
+        if response_data_2[0]["InfoFromEdi"] != None:
+            for i in response_data_2[0]["InfoFromEdi"]["TMailitemInfoFromEDI"][0]["Events"]["TMailitemEventEDI"]:
+                if i["IPSEventType"]["Name"] == "Items on way":
+                    local_datetime = datetime.strptime(i['GmtDateTime'], "%Y-%m-%dT%H:%M:%S")
+                    compare_date = datetime(2025, 3, 6)
+                    if local_datetime <= compare_date:
+                        form = {
+                            "EventOffice": {
+                                "Code": "UZTASA",
+                                "Name": "UzPost"
+                            },
+                            "IPSEventType": {
+                                "Code": None,
+                                "Name": None,
+                                "LocalName": None
+                            },
+                            "date": None
+                        }
+                        for i in response_data_2[0]["InfoFromEdi"]["TMailitemInfoFromEDI"][0]["Events"][
+                            "TMailitemEventEDI"]:
+                            form["IPSEventType"]["Code"] = i["IPSEventType"]["Name"]
+                            form["IPSEventType"]["Code"] = i["IPSEventType"]["Code"]
+                            form["IPSEventType"]["LocalName"] = i["IPSEventType"]["Localname"]
+                            form["date"] = i['GmtDateTime']
+                            full_track_temu.append(form)
+                        if response_data_2[0]["OperationalMailitems"] != None:
+                            for j in response_data_2[0]["OperationalMailitems"]["TMailitemInfoFromScanning"][0]["Events"][
+                            "TMailitemEventScanning"]:
+                                form_op = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
+                                }
+                                form_op["IPSEventType"]["Code"] = j["IPSEventType"]["Name"]
+                                form_op["IPSEventType"]["Code"] = j["IPSEventType"]["Code"]
+                                form_op["IPSEventType"]["LocalName"] = j["IPSEventType"]["Localname"]
+                                form_op["date"] = j['GmtDateTime']
+                                full_track_temu.append(form_op)
+                        if not any(item_x["IPSEventType"]["Name"] == "Deliver item (Inb)" for item_x in
+                                   full_track_temu) or not any(item_x["IPSEventType"]["Name"] == "Deliver item (Otb)" for item_x in
+                                   full_track_temu):
+                            for data in data_shipox['data']["list"]:
+                                if data["status"] == 'issued_to_recipient':
+                                    form_f = {
+                                        "EventOffice": {
+                                            "Code": "UZTASA",
+                                            "Name": "UzPost"
+                                        },
+                                        "IPSEventType": {
+                                            "Code": None,
+                                            "Name": None,
+                                            "LocalName": None
+                                        },
+                                        "date": None
+                                    }
+                                    form_f['IPSEventType']["Name"] = "Deliver item"
+                                    form_f['IPSEventType']["LocalName"] = "Deliver item"
+                                    form_f['IPSEventType']["Code"] = "1257"
+                                    form_f["date"] = item['date']
+                                    full_track_temu.append(form_f)
+                                    break
+                                if data["status"] == 'completed':
+                                    form_j = {
+                                        "EventOffice": {
+                                            "Code": "UZTASA",
+                                            "Name": "UzPost"
+                                        },
+                                        "IPSEventType": {
+                                            "Code": None,
+                                            "Name": None,
+                                            "LocalName": None
+                                        },
+                                        "date": None
+                                    }
+                                    form_j['IPSEventType']["Name"] = "Deliver item"
+                                    form_j['IPSEventType']["LocalName"] = "Deliver item"
+                                    form_j['IPSEventType']["Code"] = "1257"
+                                    form_j["date"] = data['date']
+                                    full_track_temu.append(form_j)
+                                    break
+
+                        full_data = {}
+                        full_data['header'] = data_header
+                        full_data['data'] = full_track_temu
+
+                        return Response(data=full_data, status=200)
+
+                    form = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
+                                }
+                    form["IPSEventType"]["Code"] = i["IPSEventType"]["Name"]
+                    form["IPSEventType"]["Code"] = i["IPSEventType"]["Code"]
+                    form["IPSEventType"]["LocalName"] = i["IPSEventType"]["Localname"]
+                    form["date"] = i['GmtDateTime']
+                    full_track_temu.append(form)
+                    break
+
+
+        if response_data_2[0]["OperationalMailitems"] != None:
+            for j in response_data_2[0]["OperationalMailitems"]["TMailitemInfoFromScanning"][0]["Events"]["TMailitemEventScanning"]:
+                if j["IPSEventType"]["Name"] == "Items on way":
+                    local_datetime = datetime.strptime(j['GmtDateTime'], "%Y-%m-%dT%H:%M:%S")
+                    compare_date = datetime(2025, 3, 6)
+                    if local_datetime <= compare_date:
+                        form = {
+                            "EventOffice": {
+                                "Code": "UZTASA",
+                                "Name": "UzPost"
+                            },
+                            "IPSEventType": {
+                                "Code": None,
+                                "Name": None,
+                                "LocalName": None
+                            },
+                            "date": None
+                        }
+                        for j in response_data_2[0]["OperationalMailitems"]["TMailitemInfoFromScanning"][0]["Events"]["TMailitemEventScanning"]:
+                            form["IPSEventType"]["Code"] = j["IPSEventType"]["Name"]
+                            form["IPSEventType"]["Code"] = j["IPSEventType"]["Code"]
+                            form["IPSEventType"]["LocalName"] = j["IPSEventType"]["Localname"]
+                            form["date"] = j['GmtDateTime']
+                            full_track_temu.append(form)
+
+                        if response_data_2[0]["InfoFromEdi"] != None:
+                            for i in response_data_2[0]["InfoFromEdi"]["TMailitemInfoFromEDI"][0]["Events"][
+                                "TMailitemEventEDI"]:
+                                form_op = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
+                                }
+                                form_op["IPSEventType"]["Code"] = i["IPSEventType"]["Name"]
+                                form_op["IPSEventType"]["Code"] = i["IPSEventType"]["Code"]
+                                form_op["IPSEventType"]["LocalName"] = i["IPSEventType"]["Localname"]
+                                form_op["date"] = j['GmtDateTime']
+                                full_track_temu.append(form_op)
+                        if not any(item_x["IPSEventType"]["Name"] == "Deliver item (Inb)" for item_x in
+                                   full_track_temu) or not any(
+                            item_x["IPSEventType"]["Name"] == "Deliver item (Otb)" for item_x in
+                            full_track_temu):
+                            for data in data_shipox['data']["list"]:
+                                if data["status"] == 'issued_to_recipient':
+                                    form_f = {
+                                        "EventOffice": {
+                                            "Code": "UZTASA",
+                                            "Name": "UzPost"
+                                        },
+                                        "IPSEventType": {
+                                            "Code": None,
+                                            "Name": None,
+                                            "LocalName": None
+                                        },
+                                        "date": None
+                                    }
+                                    form_f['IPSEventType']["Name"] = "Deliver item"
+                                    form_f['IPSEventType']["LocalName"] = "Deliver item"
+                                    form_f['IPSEventType']["Code"] = "1257"
+                                    form_f["date"] = item['date']
+                                    full_track_temu.append(form_f)
+                                    break
+                                if data["status"] == 'completed':
+                                    form_j = {
+                                        "EventOffice": {
+                                            "Code": "UZTASA",
+                                            "Name": "UzPost"
+                                        },
+                                        "IPSEventType": {
+                                            "Code": None,
+                                            "Name": None,
+                                            "LocalName": None
+                                        },
+                                        "date": None
+                                    }
+                                    form_j['IPSEventType']["Name"] = "Deliver item"
+                                    form_j['IPSEventType']["LocalName"] = "Deliver item"
+                                    form_j['IPSEventType']["Code"] = "1257"
+                                    form_j["date"] = data['date']
+                                    full_track_temu.append(form_j)
+                                    break
+
+                        full_data = {}
+                        full_data['header'] = data_header
+                        full_data['data'] = full_track_temu
+
+                        return Response(data=full_data, status=200)
+
+                    form = {
+                        "EventOffice": {
+                            "Code": "UZTASA",
+                            "Name": "UzPost"
+                            },
+                        "IPSEventType": {
+                            "Code": None,
+                            "Name": None,
+                            "LocalName": None
+                            },
+                        "date": None
+                    }
+                    form["IPSEventType"]["Name"] = j["IPSEventType"]["Name"]
+                    form["IPSEventType"]["Code"] = j["IPSEventType"]["Code"]
+                    form["IPSEventType"]["LocalName"] = j["IPSEventType"]["LocalName"]
+                    form["date"] = j['GmtDateTime']
+                    full_track_temu.append(form)
+                    break
+
+        ##############
+        #############
+        ### buyog'i shipox ma'lumotlari
+        #############################
+
         max_retries = 1  # Maksimal urinishlar soni
         retry_delay = 1  # Qayta urinishdan oldin kutish (soniyada)
         url_header = f"https://prodapi.pochta.uz/api/v1/public/order/{barcode}"
-        url_shipox = f"https://prodapi.pochta.uz/api/v1/public/order/{barcode}/history_items"
-
+        url_shipox = f"https://prodapi.pochta.uz/api/v1/customer/order/{barcode}/history_items"
         for attempt in range(max_retries):
             try:
                 # APIga so'rov yuborish
-                data_header = requests.get(url_header, timeout=1)
-                data_shipox = requests.get(url_shipox, timeout=1)
-
+                data_header = requests.get(url_header, headers={
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Authorization': f'Bearer {gettoken()}'
+                }, timeout=1)
+                data_shipox = requests.get(url_shipox, headers={
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'Authorization': f'Bearer {gettoken()}'
+                }, timeout=1)
                 data_header = data_header.json()
                 data_shipox = data_shipox.json()
-                # API'dan muvaffaqiyatli javob olinsa, ma'lumotni qaytarish
-                if data_header.get('status') == "success":
-                    total_data_2 = {'header': data_header}
-                    if barcode[:2] != 'SX' and data_header["data"]['locations'][0]['country']['code'] == 'UZ' and \
-                            data_header["data"]['locations'][1]['country']['code'] == 'UZ':
+                if data_header['status'] != 'success':
+                    return Response(data=data_header, status=404)
+                if data_shipox['status'] != 'success':
+                    return Response(data=data_header, status=404)
+                #######################################
 
-                        total_data_2['shipox'] = data_shipox
-                        total_data_2['gdeposilka'] = None
-                        return Response(total_data_2, status=status.HTTP_200_OK)
-                    total_data_2 = {"header": data_header, "shipox": data_shipox}
+                ##### 1-status uchun tekshirish
 
-                    # gdeposilka ma'lumotlari shipox bilan bog'liqlari
+                for item in data_shipox['data']['list']:
+                    if item["status"] == 'in_sorting_facility':
+                        form = {
+                            "EventOffice": {
+                                "Code": "UZTASA",
+                                "Name": "UzPost"
+                            },
+                            "IPSEventType": {
+                                "Code": None,
+                                "Name": None,
+                                "LocalName": None
+                            },
+                            "date": None
+                        }
+                        form['IPSEventType']["Name"] = "Arrived item at office of exchange"
+                        form['IPSEventType']["LocalName"] = "Arrived item at office of exchange"
+                        form['IPSEventType']["Code"] = "1251"
+                        form["date"] = item["date"]
+                        last_form = form
+                if last_form:
+                    full_track_temu.append(last_form)
 
-                    url1 = f"https://gdeposylka.ru/api/v4/tracker/detect/{barcode}"
-                    headers = {
-                        "X-Authorization-Token": "65bbbac85f796f8032e0874411f4d1f5af7185a99e184709bf0c1f38d95486fa2338733760a48704"
-                    }
-                    response1 = requests.get(url1, headers=headers)
-                    data = response1.json()
 
-                    if len(data["data"]) != 0:
-                        url2 = f"https://gdeposylka.ru{data['data'][0]['tracker_url']}"
-                        response2 = requests.get(url2, headers=headers)
-                        response_x = response2.json()
-                        if len(response_x["messages"]) == 0:
-                            gdeposylka = {
-                                "result": response_x['result'],
-                                'data': {
-                                    'id': response_x['data']['id'],
-                                    'tracking_number': response_x['data']['tracking_number'],
-                                    "tracking_number_secondary": response_x['data']['tracking_number_secondary'],
-                                    "tracking_number_current": response_x['data']['tracking_number_current'],
-                                    "courier": response_x['data']['courier'],
-                                    "is_active": response_x['data']['is_active'],
-                                    "is_delivered": response_x['data']['is_delivered'],
-                                    "last_check": response_x['data']['last_check'],
-                                    'checkpoints': [],
-                                    "extra": response_x['data']['extra']
+                ######### 2- status uchun tekshirish
+
+                for item in data_shipox['data']['list']:
+                    if item["status"] == 'sent_to_customs':
+                        form = {
+                            "EventOffice": {
+                                "Code": "UZTASA",
+                                "Name": "UzPost"
+                            },
+                            "IPSEventType": {
+                                "Code": None,
+                                "Name": None,
+                                "LocalName": None
+                            },
+                            "date": None
+                        }
+                        form['IPSEventType']["Name"] = "Send item to customs"
+                        form['IPSEventType']["LocalName"] = "Send item to customs"
+                        form['IPSEventType']["Code"] = "1252"
+                        form["date"] = item["date"]
+                        full_track_temu.append(form)
+                        break
+
+                ############# 3-status uchun tekshirish
+
+                for item in data_shipox['data']['list']:
+                    if item["status"] == 'hold_on_at_customs':
+                        form = {
+                            "EventOffice": {
+                                "Code": "UZTASA",
+                                "Name": "UzPost"
+                            },
+                            "IPSEventType": {
+                                "Code": None,
+                                "Name": None,
+                                "LocalName": None
+                            },
+                            "date": None
+                        }
+                        form['IPSEventType']["Name"] = "Custom Clearance Exception - Inspection"
+                        form['IPSEventType']["LocalName"] = "Custom Clearance Exception - Inspection"
+                        form['IPSEventType']["Code"] = "1262"
+                        form['IPSEventType']["Comment"] = "High-value goods - Official customs declaration required"
+                        form["date"] = item["date"]
+                        full_track_temu.append(form)
+                        break
+                #### 4- status uchun tekshirish
+                for item in data_shipox['data']['list']:
+                    if item["status"] == 'returned_from_customs':
+                        form = {
+                            "EventOffice": {
+                                "Code": "UZTASA",
+                                "Name": "UzPost"
+                            },
+                            "IPSEventType": {
+                                "Code": None,
+                                "Name": None,
+                                "LocalName": None
+                            },
+                            "date": None
+                        }
+                        form['IPSEventType']["Name"] = "Return item from customs"
+                        form['IPSEventType']["LocalName"] = "Return item from customs"
+                        form['IPSEventType']["Code"] = "1253"
+                        form["date"] = item["date"]
+                        full_track_temu.append(form)
+                        ########### 10 min qo'shib qo'shiladi
+                        form_1 = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
                                 }
+                        form_1['IPSEventType']["Name"] = "Send item to domestic location"
+                        form_1['IPSEventType']["LocalName"] = "Send item to domestic location"
+                        form_1['IPSEventType']["Code"] = "1254"
+                        date_obj = datetime.fromisoformat(item["date"][:19]) + timedelta(minutes=10)
+                        form_1["date"] = date_obj.isoformat()
+                        full_track_temu.append(form_1)
+
+                        ###### yana 20 minut qo'shib qo'shiladi
+                        form_2 = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
+                                }
+                        form_2['IPSEventType']["Name"] = "Receive item at delivery office"
+                        form_2['IPSEventType']["LocalName"] = "Receive item at delivery office"
+                        form_2['IPSEventType']["Code"] = "1255"
+                        date_obj = datetime.fromisoformat(item["date"][:19]) + timedelta(minutes=20)
+                        form_2["date"] = date_obj.isoformat()
+                        full_track_temu.append(form_2)
+
+                        # ######## yana 50 min qo'shib qo'yiladi
+                        form_3 = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
+                                }
+                        # form_3['IPSEventType']["Name"] = "Ready for Delivery"
+                        # form_3['IPSEventType']["LocalName"] = "Ready for Delivery"
+                        # form_3['IPSEventType']["Code"] = "1263"
+                        # date_obj = datetime.fromisoformat(item["date"][:19]) + timedelta(minutes=50)
+                        # form_3["date"] = date_obj.isoformat()
+                        # full_track_temu.append(form_3)
+                        break
+
+                ############## ready for delivery ga tekshirish
+
+                for item in data_shipox['data']['list']:
+                    if item["status"] == 'ready_for_delivery':
+                        for item_x in full_track_temu:
+                            if "ready_for_delivery" == item_x["IPSEventType"]["Name"]:
+                                item_x["IPSEventType"]["date"] = item["date"]
+
+                        if not any(item_x["IPSEventType"]["Name"] == "Return item from customs" for item_x in full_track_temu):
+
+                                form = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
+                                }
+                                form['IPSEventType']["Name"] = "Return item from customs"
+                                form['IPSEventType']["LocalName"] = "Return item from customs"
+                                form['IPSEventType']["Code"] = "1253"
+                                date_obj = datetime.fromisoformat(item["date"][:19]) - timedelta(minutes=50)
+                                form["date"] = date_obj.isoformat()
+                                full_track_temu.append(form)
+
+                                ########### 10 min qo'shib qo'shiladi
+                                form_1 = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
+                                }
+                                form_1['IPSEventType']["Name"] = "Send item to domestic location"
+                                form_1['IPSEventType']["LocalName"] = "Send item to domestic location"
+                                form_1['IPSEventType']["Code"] = "1254"
+                                date_obj = datetime.fromisoformat(item["date"][:19]) - timedelta(minutes=40)
+                                form_1["date"] = date_obj.isoformat()
+                                full_track_temu.append(form_1)
+
+                                ###### yana 20 minut qo'shib qo'shiladi
+                                form_2 = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
+                                }
+                                form_2['IPSEventType']["Name"] = "Receive item at delivery office"
+                                form_2['IPSEventType']["LocalName"] = "Receive item at delivery office"
+                                form_2['IPSEventType']["Code"] = "1255"
+                                date_obj = datetime.fromisoformat(item["date"][:19]) - timedelta(minutes=30)
+                                form_1["date"] = date_obj.isoformat()
+                                full_track_temu.append(form_2)
+
+                        form_3 = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
+                                }
+                        form_3['IPSEventType']["Name"] = "Ready for Delivery"
+                        form_3['IPSEventType']["LocalName"] = "Ready for Delivery"
+                        form_3['IPSEventType']["Code"] = "1263"
+                        form_3["date"] = item['date']
+                        full_track_temu.append(form_3)
+                        break
+
+                    ############### out for deliveryga tekshirish
+                    if item["status"] == 'out_for_delivery':
+                        if not any(item_x["IPSEventType"]["Name"] == "Return item from customs" for item_x in full_track_temu):
+                            form = {
+                                "EventOffice": {
+                                    "Code": "UZTASA",
+                                    "Name": "UzPost"
+                                },
+                                "IPSEventType": {
+                                    "Code": None,
+                                    "Name": None,
+                                    "LocalName": None
+                                },
+                                "date": None
                             }
-                            for points in response_x['data']['checkpoints']:
-                                if points['courier']['slug'] != 'ozbekiston-pochtasi':
-                                    gdeposylka['data']['checkpoints'].append(points)
-                            total_data_2['gdeposilka'] = gdeposylka
-                        else:
-                            time.sleep(15)
-                            response2 = requests.get(url2, headers=headers)
-                            response_x = response2.json()
-                            if len(response_x['messages']) == 0:
-                                gdeposylka = {
-                                    "result": response_x['result'],
-                                    'data': {
-                                        'id': response_x['data']['id'],
-                                        'tracking_number': response_x['data']['tracking_number'],
-                                        "tracking_number_secondary": response_x['data']['tracking_number_secondary'],
-                                        "tracking_number_current": response_x['data']['tracking_number_current'],
-                                        "courier": response_x['data']['courier'],
-                                        "is_active": response_x['data']['is_active'],
-                                        "is_delivered": response_x['data']['is_delivered'],
-                                        "last_check": response_x['data']['last_check'],
-                                        'checkpoints': [],
-                                        "extra": response_x['data']['extra']
-                                    }
-                                }
-                                for points in response_x['data']['checkpoints']:
-                                    if points['courier']['slug'] != 'ozbekiston-pochtasi':
-                                        gdeposylka['data']['checkpoints'].append(points)
-                                total_data_2['gdeposilka'] = gdeposylka
-                            else:
-                                total_data_2['gdeposilka'] = "please try again we are processing the data"
-                        return Response(total_data_2, status=status.HTTP_200_OK)
-                    total_data_2['gdeposilka'] = None
-                    return Response(total_data_2, status=status.HTTP_200_OK)
-                else:
-                    total_data_2 = {"header": None, "shipox": None}
+                            form['IPSEventType']["Name"] = "Return item from customs"
+                            form['IPSEventType']["LocalName"] = "Return item from customs"
+                            form['IPSEventType']["Code"] = "1253"
+                            date_obj = datetime.fromisoformat(item["date"][:19]) - timedelta(minutes=50)
+                            form["date"] = date_obj.isoformat()
+                            full_track_temu.append(form)
 
+                            ########### 10 min qo'shib qo'shiladi
+                            form_1 = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
+                                }
+                            form_1['IPSEventType']["Name"] = "Send item to domestic location"
+                            form_1['IPSEventType']["LocalName"] = "Send item to domestic location"
+                            form_1['IPSEventType']["Code"] = "1254"
+                            date_obj = datetime.fromisoformat(item["date"][:19]) - timedelta(minutes=40)
+                            form_1["date"] = date_obj.isoformat()
+                            full_track_temu.append(form_1)
+
+                            ###### yana 20 minut qo'shib qo'shiladi
+                            form_2 = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
+                                }
+                            form_2['IPSEventType']["Name"] = "Receive item at delivery office"
+                            form_2['IPSEventType']["LocalName"] = "Receive item at delivery office"
+                            form_2['IPSEventType']["Code"] = "1255"
+                            date_obj = datetime.fromisoformat(item["date"][:19]) - timedelta(minutes=30)
+                            form_1["date"] = date_obj.isoformat()
+                            full_track_temu.append(form_2)
+
+                        form_3 = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
+                                }
+                        form_3['IPSEventType']["Name"] = "Out for delivery"
+                        form_3['IPSEventType']["LocalName"] = "Out for delivery"
+                        form_3['IPSEventType']["Code"] = "1264"
+                        form_3["date"] = item['date']
+                        full_track_temu.append(form_3)
+                        break
+
+                for item in data_shipox['data']['list']:
+                    if item["status"] == 'not_at_home':
+                        form_2 = {
+                            "EventOffice": {
+                                "Code": "UZTASA",
+                                "Name": "UzPost"
+                            },
+                            "IPSEventType": {
+                                "Code": None,
+                                "Name": None,
+                                "LocalName": None
+                            },
+                            "date": None
+                        }
+                        form_2['IPSEventType']["Name"] = "Unsuccessful item delivery attempt - Addressee not available"
+                        form_2['IPSEventType']["LocalName"] = "Unsuccessful item delivery attempt - Addressee not available"
+                        form_2['IPSEventType']["Code"] = "1256"
+                        form_2["date"] = item["date"]
+                        full_track_temu.append(form_2)
+
+                        form_3 = {
+                            "EventOffice": {
+                                "Code": "UZTASA",
+                                "Name": "UzPost"
+                            },
+                            "IPSEventType": {
+                                "Code": None,
+                                "Name": None,
+                                "LocalName": None
+                            },
+                            "date": None
+                        }
+                        form_3['IPSEventType']["Name"] = "Unsuccessful item delivery attempt -Customer requested own Pick up"
+                        form_3['IPSEventType'][
+                            "LocalName"] = "Unsuccessful item delivery attempt -Customer requested own Pick up"
+                        form_3['IPSEventType']["Code"] = "1268"
+                        date_obj = datetime.fromisoformat(item["date"][:19]) + timedelta(minutes=2)
+                        form_3["date"] = date_obj.isoformat()
+                        full_track_temu.append(form_3)
+                        break
+
+
+                ######## delivered uchun tekshirish
+                for item in data_shipox['data']['list']:
+                    if item["status"] == 'completed':
+                        if not any(item_x["IPSEventType"]["Name"] == "Out for delivery" for item_x in full_track_temu):
+                            form_2 = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
+                                }
+                            form_2['IPSEventType']["Name"] = "Out for delivery"
+                            form_2['IPSEventType']["LocalName"] = "Out for delivery"
+                            form_2['IPSEventType']["Code"] = "1264"
+                            date_obj = datetime.fromisoformat(item["date"][:19]) - timedelta(minutes=20)
+                            form_2["date"] = date_obj.isoformat()
+                            full_track_temu.append(form_2)
+
+                        form_j = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
+                                }
+                        form_j['IPSEventType']["Name"] = "Deliver item"
+                        form_j['IPSEventType']["LocalName"] = "Deliver item"
+                        form_j['IPSEventType']["Code"] = "1257"
+                        form_j["date"] = item['date']
+                        full_track_temu.append(form_j)
+                        break
+
+
+                    if item["status"] == 'issued_to_recipient':
+                        if not any(item_x["IPSEventType"]["Name"] == "Ready for Delivery" for item_x in full_track_temu) and not any(item_x["IPSEventType"]["Name"] == "Out for delivery" for item_x in full_track_temu):
+                            print("salom")
+                            form_2 = {
+                                "EventOffice": {
+                                    "Code": "UZTASA",
+                                    "Name": "UzPost"
+                                },
+                                "IPSEventType": {
+                                    "Code": None,
+                                    "Name": None,
+                                    "LocalName": None
+                                },
+                                "date": None
+                            }
+                            form_2['IPSEventType']["Name"] = "Ready for Delivery"
+                            form_2['IPSEventType']["LocalName"] = "Ready for Delivery"
+                            date_obj = datetime.fromisoformat(item["date"][:19]) - timedelta(minutes=20)
+                            form_2["date"] = date_obj.isoformat()
+                            full_track_temu.append(form_2)
+
+                        form_f = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
+                                }
+                        form_f['IPSEventType']["Name"] = "Deliver item"
+                        form_f['IPSEventType']["LocalName"] = "Deliver item"
+                        form_f['IPSEventType']["Code"] = "1257"
+                        form_f["date"] = item['date']
+                        full_track_temu.append(form_f)
+                        break
+
+                    if item["status"] == 'returning_to_origin':
+                        form_f = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
+                                }
+                        form_f['IPSEventType']["Name"] = "On the way to sender"
+                        form_f['IPSEventType']["LocalName"] = "On the way to sender"
+                        form_f['IPSEventType']["Code"] = "1266"
+                        form_f["date"] = item['date']
+                        full_track_temu.append(form_f)
+                        break
+
+                ### oxirgi status
+
+                for item in data_shipox['data']['list']:
+                    if item["status"] == 'returned_to_origin':
+                        form_f = {
+                                    "EventOffice": {
+                                        "Code": "UZTASA",
+                                        "Name": "UzPost"
+                                    },
+                                    "IPSEventType": {
+                                        "Code": None,
+                                        "Name": None,
+                                        "LocalName": None
+                                    },
+                                    "date": None
+                                }
+                        form_f['IPSEventType']["Name"] = "Delivered to sender"
+                        form_f['IPSEventType']["LocalName"] = "Delivered to sender"
+                        form_f['IPSEventType']["Code"] = "1266"
+                        form_f["date"] = item['date']
+                        full_track_temu.append(form_f)
+                        break
+                full_data = {}
+                full_data['header'] = data_header
+                full_data['data'] = full_track_temu
+
+                return Response(data=full_data, status=200)
             except ConnectTimeout:
                 # Agar ulanish timeoutga uchrasa, qayta urinib ko'riladi
                 if attempt < max_retries - 1:
@@ -551,71 +1512,6 @@ class Test(APIView):
                                     "gdeposilka_header": None,
                                     "shipox": "Server bilan bo'glanishda muammo yuz berdi"}
 
-
-        # shipoxga bo'g'liq bo'lmagan gdeposilka ma'lumotlari
-
-
-        url1 = f"https://gdeposylka.ru/api/v4/tracker/detect/{barcode}"
-        headers = {
-            "X-Authorization-Token": "65bbbac85f796f8032e0874411f4d1f5af7185a99e184709bf0c1f38d95486fa2338733760a48704"
-        }
-        response1 = requests.get(url1, headers=headers)
-        data = response1.json()
-
-        if len(data["data"]) != 0:
-            url2 = f"https://gdeposylka.ru{data['data'][0]['tracker_url']}"
-            response2 = requests.get(url2, headers=headers)
-            response_x = response2.json()
-            if len(response_x["messages"]) == 0:
-                # gdeposylka = {
-                #     "result": response_x['result'],
-                #     'data': {
-                #         'id': response_x['data']['id'],
-                #         'tracking_number': response_x['data']['tracking_number'],
-                #         "tracking_number_secondary": response_x['data']['tracking_number_secondary'],
-                #         "tracking_number_current": response_x['data']['tracking_number_current'],
-                #         "courier": response_x['data']['courier'],
-                #         "is_active": response_x['data']['is_active'],
-                #         "is_delivered": response_x['data']['is_delivered'],
-                #         "last_check": response_x['data']['last_check'],
-                #         'checkpoints': [],
-                #         "extra": response_x['data']['extra']
-                #     }
-                # }
-                # for points in response_x['data']['checkpoints']:
-                #     if points['courier']['slug'] != 'ozbekiston-pochtasi':
-                #         gdeposylka['data']['checkpoints'].append(points)
-                total_data_2['gdeposilka'] = response_x
-            else:
-                time.sleep(15)
-                response2 = requests.get(url2, headers=headers)
-                response_x = response2.json()
-                if len(response_x['messages']) == 0:
-                    # gdeposylka = {
-                    #     "result": response_x['result'],
-                    #     'data': {
-                    #         'id': response_x['data']['id'],
-                    #         'tracking_number': response_x['data']['tracking_number'],
-                    #         "tracking_number_secondary": response_x['data']['tracking_number_secondary'],
-                    #         "tracking_number_current": response_x['data']['tracking_number_current'],
-                    #         "courier": response_x['data']['courier'],
-                    #         "is_active": response_x['data']['is_active'],
-                    #         "is_delivered": response_x['data']['is_delivered'],
-                    #         "last_check": response_x['data']['last_check'],
-                    #         'checkpoints': [],
-                    #         "extra": response_x['data']['extra']
-                    #     }
-                    # }
-                    # for points in response_x['data']['checkpoints']:
-                    #     if points['courier']['slug'] != 'ozbekiston-pochtasi':
-                    #         gdeposylka['data']['checkpoints'].append(points)
-                    total_data_2['gdeposilka'] = response_x
-
-                else:
-                    total_data_2['gdeposilka'] = "please try again we are processing the data"
-            return Response(total_data_2, status=status.HTTP_200_OK)
-        total_data_2['gdeposilka'] = None
-        return Response(total_data_2, status=status.HTTP_200_OK)
 
 
 @method_decorator(cache_page(60*15), name='dispatch')

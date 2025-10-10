@@ -30,6 +30,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     image = models.ImageField(upload_to='users/', null=True, blank=True)
     region = models.CharField(max_length=50, null=True, blank=True)
     district = models.CharField(max_length=50, null=True, blank=True)
+    post_index = models.CharField(max_length=50, null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
@@ -79,3 +80,17 @@ class IPAddressLog(models.Model):
     class Meta:
         db_table = 'ipaddress_log'
         ordering = ('id', )
+
+
+class CheckSMS(models.Model):
+    massage_id = models.CharField(max_length=255, primary_key=True)
+    code = models.CharField(max_length=40)
+    phone_number = models.CharField(max_length=15)
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'checksms'
+        indexes = [
+            models.Index(fields=['phone_number', 'massage_id'])
+        ]

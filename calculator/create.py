@@ -27,21 +27,40 @@ from core.middleware import static_token_required
 from rest_framework.pagination import PageNumberPagination
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
+<<<<<<< HEAD
 from .import_data import import_data
 from .models import Warehouse
 from .serializers import WarehouseSerializer
 from .views import gettoken
 
+=======
+from maps.models import Warehouse
+from maps.serializers import WarehouseSerializer
+from .views import gettoken
+from .models import OrderCart
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+>>>>>>> 2d32d04 (full complated uzpost backend)
 
 class CustomUserThrottle(UserRateThrottle):
     rate = '30/minute'
 
 
 class CreateOrderApiView(APIView):
+<<<<<<< HEAD
     # permission_classes = [IsAuthenticated, ]
     throttle_classes = [CustomUserThrottle, ]
 
     def post(self, request):
+=======
+    permission_classes = [IsAuthenticated, ]
+    throttle_classes = [CustomUserThrottle, ]
+
+    def post(self, request):
+        user = request.user
+>>>>>>> 2d32d04 (full complated uzpost backend)
         headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -49,11 +68,19 @@ class CreateOrderApiView(APIView):
         }
 
         weight = request.query_params.get("Weight")
+<<<<<<< HEAD
         if weight is None or type(weight) != float:
             return Response(data="invalid Weight",
                             status=status.HTTP_400_BAD_REQUEST)
         try:
             weight = int(weight)
+=======
+        if weight is None:
+            return Response(data="invalid Weight",
+                            status=status.HTTP_400_BAD_REQUEST)
+        try:
+            weight = float(weight)
+>>>>>>> 2d32d04 (full complated uzpost backend)
         except ValueError:
             return Response(data="Invalid Weight: Must be an float", status=status.HTTP_400_BAD_REQUEST)
 
@@ -94,9 +121,15 @@ class CreateOrderApiView(APIView):
         if SenderPhoneNumber is None:
             return Response(data="invalid SenderPhoneNumber", status=status.HTTP_400_BAD_REQUEST)
 
+<<<<<<< HEAD
         SenderAddress = request.query_params.get("sender_address")
         if SenderAddress is None:
             return Response(data="invalid Address", status=status.HTTP_400_BAD_REQUEST)
+=======
+        SenderAddress = request.query_params.get("SenderAddress")
+        if SenderAddress is None:
+            return Response(data="invalid SenderAddress", status=status.HTTP_400_BAD_REQUEST)
+>>>>>>> 2d32d04 (full complated uzpost backend)
 
         ReseipentName = request.query_params.get("ReseipmentName")
         if ReseipentName is None:
@@ -181,13 +214,57 @@ class CreateOrderApiView(APIView):
             }
         }
         result = requests.post("https://prodapi.pochta.uz/api/v1/customer/order", json=create_order, headers=headers)
+<<<<<<< HEAD
+=======
+        if result.json()["status"] == "success":
+            OrderCart.objects.create(
+                user=user,
+                weight=result.json()["data"]["dimensions"]["weight"],
+                barcode=result.json()["data"]["order_number"],
+                fromjurisdiction=f"{result.json()['data']['sender_data']['jurisdiction']['parent']['parent']['name']}, "
+                                 f"{result.json()['data']['sender_data']['jurisdiction']['parent']['name']}, "
+                                 f"{result.json()['data']['sender_data']['jurisdiction']['name']}, "
+                                 f"{result.json()['data']['sender_data']['address']}, "
+                                 f"{result.json()['data']['sender_data']['postcode_index']}, "
+                                 f"{result.json()['data']['sender_data']['phone']}",
+                tojurisdiction=f"{result.json()['data']['recipient_data']['jurisdiction']['parent']['parent']['name']}, "
+                               f"{result.json()['data']['recipient_data']['jurisdiction']['parent']['name']}, "
+                               f"{result.json()['data']['recipient_data']['jurisdiction']['name']}, "
+                               f"{result.json()['data']['recipient_data']['address']}, "
+                               f"{result.json()['data']['recipient_data']['postcode_index']}, "
+                               f"{result.json()['data']['recipient_data']['phone']}",
+                from_phone_number=result.json()["data"]["sender_data"]["phone"],
+                to_phone_number=result.json()["data"]["recipient_data"]["phone"],
+                full_name=result.json()["data"]["sender_data"]["name"],
+                from_country_code=result.json()["data"]["sender_data"]["country"]["code"],
+                to_country_code=result.json()["data"]["recipient_data"]["country"]["code"],
+                price=result.json()["data"]["total_charge"],
+                price_code=result.json()["data"]["currency"]["name"],
+                payment_type=result.json()["data"]["payment_type"],
+                shipment_type=f"{result.json()['data']['package_type']['name']}, "
+                              f"{result.json()['data']['package_type']['courier_type']['name']}",
+                shipox_created_at=result.json()["data"]["created_date"],
+                shipox_last_status_date=result.json()["data"]["last_status_date"],
+                order_status=True,
+                response_data=result.json(),
+            )
+>>>>>>> 2d32d04 (full complated uzpost backend)
         return Response(data=result.json(), status=status.HTTP_200_OK)
 
 
 class CreateOderIndexAPIView(APIView):
+<<<<<<< HEAD
     # permission_classes = [IsAuthenticated, ]
     throttle_classes = [CustomUserThrottle, ]
     def post(self, request):
+=======
+    permission_classes = [IsAuthenticated, ]
+    throttle_classes = [CustomUserThrottle, ]
+
+
+    def post(self, request):
+        user = request.user
+>>>>>>> 2d32d04 (full complated uzpost backend)
         headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -195,11 +272,18 @@ class CreateOderIndexAPIView(APIView):
         }
 
         weight = request.query_params.get("Weight")
+<<<<<<< HEAD
         if weight is None or type(weight) != float:
             return Response(data="invalid Weight",
                             status=status.HTTP_400_BAD_REQUEST)
         try:
             weight = int(weight)
+=======
+        if weight is None:
+            return Response(data="invalid Weight", status=status.HTTP_400_BAD_REQUEST)
+        try:
+            weight = float(weight)
+>>>>>>> 2d32d04 (full complated uzpost backend)
         except ValueError:
             return Response(data="Invalid Weight: Must be an float", status=status.HTTP_400_BAD_REQUEST)
 
@@ -226,7 +310,11 @@ class CreateOderIndexAPIView(APIView):
         if Index is None:
             return Response(data="invalid Index", status=status.HTTP_400_BAD_REQUEST)
         try:
+<<<<<<< HEAD
             Index = int(tojurisdiction_id)
+=======
+            Index = int(Index)
+>>>>>>> 2d32d04 (full complated uzpost backend)
         except ValueError:
             return Response(data="Invalid Index: Must be an int", status=status.HTTP_400_BAD_REQUEST)
 
@@ -240,9 +328,15 @@ class CreateOderIndexAPIView(APIView):
         if SenderPhoneNumber is None:
             return Response(data="invalid SenderPhoneNumber", status=status.HTTP_400_BAD_REQUEST)
 
+<<<<<<< HEAD
         SenderAddress = request.query_params.get("sender_address")
         if SenderAddress is None:
             return Response(data="invalid Address", status=status.HTTP_400_BAD_REQUEST)
+=======
+        SenderAddress = request.query_params.get("SenderAddress")
+        if SenderAddress is None:
+            return Response(data="invalid SenderAddress", status=status.HTTP_400_BAD_REQUEST)
+>>>>>>> 2d32d04 (full complated uzpost backend)
 
         ReseipentName = request.query_params.get("ReseipmentName")
         if ReseipentName is None:
@@ -334,13 +428,56 @@ class CreateOderIndexAPIView(APIView):
             }
         }
         result = requests.post("https://prodapi.pochta.uz/api/v1/customer/order", json=create_order, headers=headers)
+<<<<<<< HEAD
+=======
+        if result.json()["status"] == "success":
+            OrderCart.objects.create(
+                user=user,
+                weight=result.json()["data"]["dimensions"]["weight"],
+                barcode=result.json()["data"]["order_number"],
+                fromjurisdiction=f"{result.json()['data']['sender_data']['jurisdiction']['parent']['parent']['name']}, "
+                                 f"{result.json()['data']['sender_data']['jurisdiction']['parent']['name']}, "
+                                 f"{result.json()['data']['sender_data']['jurisdiction']['name']}, "
+                                 f"{result.json()['data']['sender_data']['address']}, "
+                                 f"{result.json()['data']['sender_data']['postcode_index']}, "
+                                 f"{result.json()['data']['sender_data']['phone']}",
+                tojurisdiction=f"{result.json()['data']['recipient_data']['jurisdiction']['parent']['parent']['name']}, "
+                               f"{result.json()['data']['recipient_data']['jurisdiction']['parent']['name']}, "
+                               f"{result.json()['data']['recipient_data']['jurisdiction']['name']}, "
+                               f"{result.json()['data']['recipient_data']['address']}, "
+                               f"{result.json()['data']['recipient_data']['postcode_index']}, "
+                               f"{result.json()['data']['recipient_data']['phone']}",
+                from_phone_number=result.json()["data"]["sender_data"]["phone"],
+                to_phone_number=result.json()["data"]["recipient_data"]["phone"],
+                full_name=result.json()["data"]["sender_data"]["name"],
+                from_country_code=result.json()["data"]["sender_data"]["country"]["code"],
+                to_country_code=result.json()["data"]["recipient_data"]["country"]["code"],
+                price=result.json()["data"]["total_charge"],
+                price_code=result.json()["data"]["currency"]["name"],
+                payment_type=result.json()["data"]["payment_type"],
+                shipment_type=f"{result.json()['data']['package_type']['name']}, "
+                              f"{result.json()['data']['package_type']['courier_type']['name']}",
+                shipox_created_at=result.json()["data"]["created_date"],
+                shipox_last_status_date=result.json()["data"]["last_status_date"],
+                order_status=True,
+                response_data=result.json(),
+            )
+
+>>>>>>> 2d32d04 (full complated uzpost backend)
         return Response(data=result.json(), status=status.HTTP_200_OK)
 
 
 class CancelOrderAPIView(APIView):
+<<<<<<< HEAD
     # permission_classes = [IsAuthenticated, ]
     throttle_classes = [CustomUserThrottle, ]
     def put(self, request):
+=======
+    permission_classes = [IsAuthenticated, ]
+    throttle_classes = [CustomUserThrottle, ]
+    def put(self, request):
+        user= request.user
+>>>>>>> 2d32d04 (full complated uzpost backend)
         headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -349,5 +486,36 @@ class CancelOrderAPIView(APIView):
         barcode = request.query_params.get("barcode")
         if not barcode:
             return Response(data="invalid barcode", status=status.HTTP_400_BAD_REQUEST)
+<<<<<<< HEAD
         result = requests.put(f"https://prodapi.pochta.uz/api/v1/customer/order/cancel?barcode={barcode}", headers=headers)
+=======
+        user_order = OrderCart.objects.filter(barcode=barcode).first()
+        if not user_order:
+            return Response("Not found", status=status.HTTP_404_NOT_FOUND)
+        if user_order.user != user:
+            return Response("you do not have permission to perform this action", status=status.HTTP_403_FORBIDDEN)
+        result = requests.put(f"https://prodapi.pochta.uz/api/v1/customer/order/cancel?barcode={barcode}", headers=headers)
+        if result.json()["status"] == "success":
+            user_order.order_status = False
+            user_order.save()
+            return Response(data=result.json(), status=status.HTTP_200_OK)
+        return Response(data=result.json(), status=status.HTTP_200_OK)
+
+
+class ShippingLabelOrderAPIView(APIView):
+    permission_classes = [IsAuthenticated, ]
+    throttle_classes = [CustomUserThrottle, ]
+
+    def get(self, request):
+        headers = {
+            'Content-Type': 'application/json',
+            #'Accept': 'application/json',
+            'Authorization': f'Bearer {gettoken()}'
+        }
+        # barcode = request.query_params.get("barcode")
+        # if not barcode:
+        #     return Response(data="invalid barcode", status=status.HTTP_400_BAD_REQUEST)
+        print(request.user)
+        result = requests.get(f"https://prodapi.pochta.uz/api/v2/customer/230707", headers=headers)
+>>>>>>> 2d32d04 (full complated uzpost backend)
         return Response(data=result.json(), status=status.HTTP_200_OK)
