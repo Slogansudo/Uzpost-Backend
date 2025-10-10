@@ -1,3 +1,7 @@
+📧 srmslogan6040@gmail.com
+
+🌐 https://uz.post
+
 # 🇺🇿 UzPost — Milliy Pochta Xizmati Onlayn Platformasi
 
 ## 📖 Loyiha tavsifi
